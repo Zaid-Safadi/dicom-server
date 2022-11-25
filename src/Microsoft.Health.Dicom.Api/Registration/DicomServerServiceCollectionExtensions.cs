@@ -17,7 +17,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.Health.Api.Features.Audit;
 using Microsoft.Health.Api.Features.Context;
-using Microsoft.Health.Api.Features.Cors;
 using Microsoft.Health.Api.Features.Headers;
 using Microsoft.Health.Api.Modules;
 using Microsoft.Health.Dicom.Api.Configs;
@@ -101,6 +100,7 @@ public static class DicomServerServiceCollectionExtensions
         services.AddSingleton(Options.Create(dicomServerConfiguration.Services.BlobMigration));
         services.AddSingleton(Options.Create(dicomServerConfiguration.Services.InstanceMetadataCacheConfiguration));
         services.AddSingleton(Options.Create(dicomServerConfiguration.Services.FramesRangeCacheConfiguration));
+        services.AddSingleton(Options.Create(dicomServerConfiguration.Cors));
 
         services.RegisterAssemblyModules(Assembly.GetExecutingAssembly(), dicomServerConfiguration);
         services.RegisterAssemblyModules(typeof(InitializationModule).Assembly, dicomServerConfiguration);
@@ -150,9 +150,18 @@ public static class DicomServerServiceCollectionExtensions
         services.AddSingleton<ITelemetryInitializer, DicomTelemetryInitializer>();
         services.AddSingleton<IDicomTelemetryClient, HttpDicomTelemetryClient>();
 
+        services.AddCors(options =>
+        {
+            options.AddPolicy(name: MyCorsPolicy,
+                                 policy =>
+                                 {
+                                     policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+                                 });
+        });
+
         return new DicomServerBuilder(services);
     }
-
+    private const string MyCorsPolicy = "MY_CORS_POILCY";
     private class DicomServerBuilder : IDicomServerBuilder
     {
         public DicomServerBuilder(IServiceCollection services)
@@ -181,7 +190,7 @@ public static class DicomServerServiceCollectionExtensions
                 // This middleware will add delegates to the OnStarting method of httpContext.Response for setting headers.
                 app.UseBaseHeaders();
 
-                app.UseCors(CorsConstants.DefaultCorsPolicy);
+                app.UseCors(MyCorsPolicy);
 
                 app.UseDicomRequestContext();
 
